@@ -35,6 +35,7 @@ class RunResult:
     run_id: int
     mae: np.ndarray
     r2: np.ndarray
+    smape: np.ndarray
     target_names: List[str]
 
 
@@ -47,6 +48,9 @@ class AggregateResults:
     r2_mean: np.ndarray
     r2_std: np.ndarray
     r2_stderr: np.ndarray
+    smape_mean: np.ndarray
+    smape_std: np.ndarray
+    smape_stderr: np.ndarray
     target_names: List[str]
     num_runs: int
 
@@ -424,6 +428,18 @@ def create_model(model_name: str, random_state: int = 42):
 # -------------------------------------------------------------
 # EVALUATION
 # -------------------------------------------------------------
+def smape(y_true, y_pred, epsilon=1e-8):
+    """
+    Symmetric Mean Absolute Percentage Error (sMAPE)
+    Returns per-target values.
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    denom = np.abs(y_true) + np.abs(y_pred) + epsilon
+    return 2.0 * np.mean(np.abs(y_pred - y_true) / denom, axis=0)
+
+
 def run_single_evaluation(
     model,
     X_train: pd.DataFrame,
@@ -443,11 +459,13 @@ def run_single_evaluation(
 
     mae = mean_absolute_error(y_test, preds, multioutput="raw_values")
     r2 = r2_score(y_test, preds, multioutput="raw_values")
+    smape_vals = smape(y_test.values, preds)
 
     return RunResult(
         run_id=run_id,
         mae=mae,
         r2=r2,
+        smape=smape_vals,
         target_names=list(y_test.columns),
     )
 
@@ -456,6 +474,7 @@ def aggregate_results(results: List[RunResult]) -> AggregateResults:
     """Aggregate statistics across multiple runs"""
     mae_values = np.array([r.mae for r in results])
     r2_values = np.array([r.r2 for r in results])
+    smape_values = np.array([r.smape for r in results])
 
     n = len(results)
 
@@ -463,9 +482,15 @@ def aggregate_results(results: List[RunResult]) -> AggregateResults:
         mae_mean=np.mean(mae_values, axis=0),
         mae_std=np.std(mae_values, axis=0, ddof=1),
         mae_stderr=np.std(mae_values, axis=0, ddof=1) / np.sqrt(n),
+
         r2_mean=np.mean(r2_values, axis=0),
         r2_std=np.std(r2_values, axis=0, ddof=1),
         r2_stderr=np.std(r2_values, axis=0, ddof=1) / np.sqrt(n),
+        
+        smape_mean=np.mean(smape_values, axis=0),
+        smape_std=np.std(smape_values, axis=0, ddof=1),
+        smape_stderr=np.std(smape_values, axis=0, ddof=1) / np.sqrt(n),
+        
         target_names=results[0].target_names,
         num_runs=n,
     )
@@ -494,14 +519,15 @@ def print_aggregate_results(
     print(f"Model: {model_name.upper()} | Graph: {graph.upper()} | Runs: {agg.num_runs}")
     print(f"Features: {feature_set} | Graph features: {'enabled' if use_graph_features else 'disabled'}")
     print(f"{'='*70}")
-    print(f"\n{'Target':<22s} | {'MAE Mean':>10s} ± {'StdDev':>8s} (±{'StdErr':>8s}) | {'R² Mean':>8s} ± {'StdDev':>8s}")
-    print("-" * 95)
+    print(f"\n{'Target':<22s} | {'MAE Mean':>10s} ± {'StdDev':>8s} (±{'StdErr':>8s}) | {'R² Mean':>8s} ± {'StdDev':>8s} | {'Smape':>8s} ± {'StdDev':>8s}")
+    print("-" * 110)
 
     for i, name in enumerate(agg.target_names):
         print(
             f"{name:<22s} | "
             f"{agg.mae_mean[i]:10.3f} ± {agg.mae_std[i]:8.3f} (±{agg.mae_stderr[i]:8.3f}) | "
-            f"{agg.r2_mean[i]:8.3f} ± {agg.r2_std[i]:8.3f}"
+            f"{agg.r2_mean[i]:8.3f} ± {agg.r2_std[i]:8.3f} | "
+            f"{agg.smape_mean[i]:8.3f} ± {agg.smape_std[i]:8.3f}"
         )
 
     print("\nMeasurement Uncertainty (95% CI, ±1.96σ):")

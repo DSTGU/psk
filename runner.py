@@ -56,7 +56,8 @@ def parse_output(output: str) -> Dict[str, Dict[str, float]]:
         ^\s*(?P<target>\S+)\s*\|\s*
         (?P<mae_mean>{num})\s*±\s*(?P<mae_std>{num})\s*
         \(±\s*(?P<mae_stderr>{num})\)\s*\|\s*
-        (?P<r2_mean>{num})\s*±\s*(?P<r2_std>{num})
+        (?P<r2_mean>{num})\s*±\s*(?P<r2_std>{num})\s*\|\s*
+        (?P<smape_mean>{num})\s*±\s*(?P<smape_std>{num})
         """,
         re.VERBOSE,
     )
@@ -91,6 +92,8 @@ def parse_output(output: str) -> Dict[str, Dict[str, float]]:
             "mae_stderr": float(g["mae_stderr"]),
             "r2_mean": float(g["r2_mean"]),
             "r2_std": float(g["r2_std"]),
+            "smape_mean": float(g["smape_mean"]),
+            "smape_std": float(g["smape_std"]),
         }
 
     return results
@@ -180,6 +183,8 @@ def create_result_row(
         'mae_stderr': metrics.get('mae_stderr', ''),
         'r2_mean': metrics.get('r2_mean', ''),
         'r2_std': metrics.get('r2_std', ''),
+        'smape_mean': metrics.get('smape_mean', ''),
+        'smape_std': metrics.get('smape_std', ''),
         'status': status,
         'error': error,
     }
@@ -317,6 +322,8 @@ Examples:
         'mae_stderr',
         'r2_mean',
         'r2_std',
+        'smape_mean',
+        'smape_std',
         'status',
         'error',
     ]
